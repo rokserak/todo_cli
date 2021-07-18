@@ -8,6 +8,8 @@ use std::io::prelude::*;
 use dotenv::dotenv;
 use std::path::{Path, PathBuf};
 use reqwest::blocking::Client;
+use serde::{Deserialize, Serialize};
+
 
 extern crate dotenv;
 #[macro_use] extern crate rocket;
@@ -21,16 +23,14 @@ fn main() {
     authenticate_user();
   }
 
-  let mut token = get_token();
-  token = refresh_token(token);
-
-  let client = Client::new();
-  let response = client
-    .get("https://graph.microsoft.com/v1.0/me/todo/lists")
-    .header("Authorization", token.access_token().secret().as_str())
-    .send().unwrap();
-
-  println!("{}", response.text().unwrap());
+  let task_lists = get_task_lists();
+  for list in task_lists {
+    println!("{} - {}", list.displayName, list.id);
+    let tasks = get_tasks_on_list(list);
+    for (i, task) in tasks.iter().enumerate() {
+      println!("{} - {}", i, task.title);
+    }
+  }
 }
 
 #[rocket::main]
@@ -150,4 +150,54 @@ fn refresh_token(token: BasicTokenResponse) -> BasicTokenResponse {
   let new_token = new_token_request.unwrap();
   save_token(&new_token);
   return new_token;
+}
+
+fn get_request(url: &str) -> String {
+  let mut token = get_token();
+  token = refresh_token(token);
+
+  let client = Client::new();
+  let response = client
+    .get(url)
+    .header("Authorization", token.access_token().secret().as_str())
+    .send().unwrap();
+
+  let response_text = response.text().unwrap();
+  return response_text;
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct TaskList {
+  displayName: String,
+  id: String
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct TaskLists {
+  value: Vec<TaskList>
+}
+
+fn get_task_lists() -> Vec<TaskList> {
+  let response_text = get_request("https://graph.microsoft.com/v1.0/me/todo/lists");
+  let task_lists: TaskLists = serde_json::from_str(response_text.as_str()).unwrap();
+  return task_lists.value;
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Task {
+  title: String,
+  status: String
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct TasksOnList {
+  value: Vec<Task>
+}
+
+fn get_tasks_on_list(task_list: TaskList) -> Vec<Task> {
+  let url = format!("https://graph.microsoft.com/v1.0/me/todo/lists/{}/tasks", task_list.id);
+  let response_text = get_request(url.as_str());
+  let tasks_on_list: TasksOnList = serde_json::from_str(response_text.as_str()).unwrap();
+  let tasks = tasks_on_list.value;
+  return tasks.into_iter().filter(|task| task.status == "notStarted").collect();
 }

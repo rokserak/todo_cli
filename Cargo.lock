@@ -2295,6 +2295,7 @@ dependencies = [
  "reqwest 0.11.4",
  "rocket",
  "serde",
+ "serde_json",
  "serde_yaml",
 ]
 
