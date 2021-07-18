@@ -9,6 +9,7 @@ use dotenv::dotenv;
 use std::path::{Path, PathBuf};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
+use reqwest::StatusCode;
 
 
 extern crate dotenv;
@@ -24,13 +25,19 @@ fn main() {
   }
 
   let task_lists = get_task_lists();
-  for list in task_lists {
-    println!("{} - {}", list.displayName, list.id);
-    let tasks = get_tasks_on_list(list);
-    for (i, task) in tasks.iter().enumerate() {
-      println!("{} - {}", i, task.title);
-    }
-  }
+  let opravila = task_lists.first().unwrap();
+  let task_text = String::from("test");
+  create_task(opravila, task_text);
+
+
+
+  // for list in task_lists {
+  //   println!("{} - {}", list.displayName, list.id);
+  //   let tasks = get_tasks_on_list(list);
+  //   for (i, task) in tasks.iter().enumerate() {
+  //     println!("{} - {}", i, task.title);
+  //   }
+  // }
 }
 
 #[rocket::main]
@@ -162,6 +169,31 @@ fn get_request(url: &str) -> String {
     .header("Authorization", token.access_token().secret().as_str())
     .send().unwrap();
 
+  if response.status() == StatusCode::UNAUTHORIZED {
+    refresh_token(token);
+    return get_request(url);
+  }
+
+  let response_text = response.text().unwrap();
+  return response_text;
+}
+
+fn post_request<T: Serialize>(url: &str, body: &T) -> String {
+  let mut token = get_token();
+  token = refresh_token(token);
+
+  let client = Client::new();
+  let response = client
+    .post(url)
+    .header("Authorization", token.access_token().secret().as_str())
+    .json(body)
+    .send().unwrap();
+
+  if response.status() == StatusCode::UNAUTHORIZED {
+    refresh_token(token);
+    return post_request(url, body);;
+  }
+
   let response_text = response.text().unwrap();
   return response_text;
 }
@@ -200,4 +232,18 @@ fn get_tasks_on_list(task_list: TaskList) -> Vec<Task> {
   let tasks_on_list: TasksOnList = serde_json::from_str(response_text.as_str()).unwrap();
   let tasks = tasks_on_list.value;
   return tasks.into_iter().filter(|task| task.status == "notStarted").collect();
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct NewTask {
+  title: String
+}
+
+fn create_task(task_list: &TaskList, task_content: String) {
+  let url = format!("https://graph.microsoft.com/v1.0/me/todo/lists/{}/tasks", task_list.id);
+  let task = NewTask {
+    title: task_content
+  };
+  let response = post_request(url.as_str(), &task);
+  println!("{}", response);
 }
