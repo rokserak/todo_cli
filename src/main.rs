@@ -1,7 +1,7 @@
 use oauth2::basic::{BasicClient, BasicTokenResponse};
 use oauth2::reqwest::http_client;
 use oauth2::{AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl, TokenResponse};
-use std::{thread, fs, io};
+use std::{thread, fs, io, env};
 use std::time::Duration;
 use std::fs::File;
 use std::io::prelude::*;
@@ -13,11 +13,30 @@ use reqwest::StatusCode;
 
 
 extern crate dotenv;
+extern crate clap;
+use clap::{Arg, App};
 #[macro_use] extern crate rocket;
 
 
 fn main() {
   dotenv().ok();
+
+  let matches = App::new("To Do CLI")
+    .about("CLI for viewing and creating tasks inside Microsoft To Do App")
+    .arg(Arg::with_name("list")
+      .short("l")
+      .long("list")
+      .help("List tasks on specified task list"))
+    .arg(Arg::with_name("task_list")
+      .short("t")
+      .long("task_list")
+      .takes_value(true)
+      .help("Task list that we want to view or create task on"))
+    .get_matches();
+
+  let list = matches.is_present("list");
+  let task_list = matches.value_of("task_list").unwrap_or("infinCUBE");
+  println!("{}", task_list);
 
   let token_file = get_token_file_path().unwrap();
   if !token_file.exists() {
@@ -25,19 +44,30 @@ fn main() {
   }
 
   let task_lists = get_task_lists();
-  let opravila = task_lists.first().unwrap();
-  let task_text = String::from("test");
-  create_task(opravila, task_text);
+  let task_list = task_lists
+    .iter()
+    .filter(|task| task.displayName == String::from(task_list))
+    .last().unwrap();
 
+  if list {
+    let tasks = get_tasks_on_list(task_list);
+    for (i, task) in tasks.iter().enumerate() {
+      println!("{} - {}", i, task.title);
+    }
+  } else {
+    let mut args: Vec<String> = env::args().collect();
+    args.remove(0);
 
+    if args.len() == 0 {
+      println!("Missing task content");
+      return;
+    }
 
-  // for list in task_lists {
-  //   println!("{} - {}", list.displayName, list.id);
-  //   let tasks = get_tasks_on_list(list);
-  //   for (i, task) in tasks.iter().enumerate() {
-  //     println!("{} - {}", i, task.title);
-  //   }
-  // }
+    let task_text = args.join(" ");
+
+    let task_text = String::from(task_text);
+    create_task(task_list, task_text);
+  }
 }
 
 #[rocket::main]
@@ -191,7 +221,7 @@ fn post_request<T: Serialize>(url: &str, body: &T) -> String {
 
   if response.status() == StatusCode::UNAUTHORIZED {
     refresh_token(token);
-    return post_request(url, body);;
+    return post_request(url, body);
   }
 
   let response_text = response.text().unwrap();
@@ -226,7 +256,7 @@ struct TasksOnList {
   value: Vec<Task>
 }
 
-fn get_tasks_on_list(task_list: TaskList) -> Vec<Task> {
+fn get_tasks_on_list(task_list: &TaskList) -> Vec<Task> {
   let url = format!("https://graph.microsoft.com/v1.0/me/todo/lists/{}/tasks", task_list.id);
   let response_text = get_request(url.as_str());
   let tasks_on_list: TasksOnList = serde_json::from_str(response_text.as_str()).unwrap();
@@ -244,6 +274,5 @@ fn create_task(task_list: &TaskList, task_content: String) {
   let task = NewTask {
     title: task_content
   };
-  let response = post_request(url.as_str(), &task);
-  println!("{}", response);
+  let _ = post_request(url.as_str(), &task);
 }
