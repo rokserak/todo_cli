@@ -1,24 +1,36 @@
-use oauth2::basic::BasicClient;
+use oauth2::basic::{BasicClient, BasicTokenResponse};
 use oauth2::reqwest::http_client;
-use oauth2::{AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl};
-use std::{thread, fs};
+use oauth2::{AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl, TokenResponse};
+use std::{thread, fs, io};
 use std::time::Duration;
-extern crate dotenv;
 use std::fs::File;
 use std::io::prelude::*;
 use dotenv::dotenv;
+use std::path::{Path, PathBuf};
+use reqwest::blocking::Client;
 
+extern crate dotenv;
 #[macro_use] extern crate rocket;
 
 
 fn main() {
   dotenv().ok();
 
-  thread::spawn(|| {
-    launch_rocket();
-  });
-  thread::sleep(Duration::from_secs(1));
-  authenticate_user();
+  let token_file = get_token_file_path().unwrap();
+  if !token_file.exists() {
+    authenticate_user();
+  }
+
+  let mut token = get_token();
+  token = refresh_token(token);
+
+  let client = Client::new();
+  let response = client
+    .get("https://graph.microsoft.com/v1.0/me/todo/lists")
+    .header("Authorization", token.access_token().secret().as_str())
+    .send().unwrap();
+
+  println!("{}", response.text().unwrap());
 }
 
 #[rocket::main]
@@ -27,6 +39,11 @@ async fn launch_rocket() {
 }
 
 fn authenticate_user() {
+  thread::spawn(|| {
+    launch_rocket();
+  });
+  thread::sleep(Duration::from_secs(1));
+
   let client_id = dotenv::var("TODO_CLI_CLIENT_ID").ok().unwrap();
   let client_secret = dotenv::var("TODO_CLI_CLIENT_SECRET").ok().unwrap();
   let auth_url = dotenv::var("TODO_CLI_AUTH_URL").ok().unwrap();
@@ -51,7 +68,13 @@ fn authenticate_user() {
     .url();
 
   println!("Open this URL in your browser:\n{}\n", authorize_url.to_string());
-  while true {}
+
+  let token_file = get_token_file_path().unwrap();
+  loop {
+    if token_file.exists() {
+      break;
+    }
+  }
 }
 
 #[get("/auth?<code>")]
@@ -75,19 +98,56 @@ fn auth_route(code: &str) -> &'static str {
     .request(http_client);
 
   if token.is_ok() {
-    let token_serialized = serde_yaml::to_string(&token.unwrap()).ok().unwrap();
-
-    let mut cli_config_dir = dirs::config_dir().unwrap().to_str().unwrap().to_owned();
-    cli_config_dir.push_str("/todo_cli");
-    fs::create_dir(cli_config_dir);
-
-    let mut token_file_path = dirs::config_dir().unwrap().to_str().unwrap().to_owned();
-    token_file_path.push_str("/todo_cli/token.yaml");
-    let mut file = File::create(token_file_path.as_str()).unwrap();
-    file.write_all(token_serialized.as_bytes());
+    save_token(&token.unwrap());
   } else {
     return "Something went wrong during authentication. Please try again.";
   }
 
   return "You have successfully authenticated, this tab can now be closed.";
+}
+
+fn get_token_file_path() -> io::Result<PathBuf> {
+  let mut cli_config_dir = dirs::config_dir().unwrap().to_str().unwrap().to_owned();
+  cli_config_dir.push_str("/todo_cli");
+  if !Path::new(cli_config_dir.as_str()).exists() {
+    let _ = fs::create_dir(cli_config_dir);
+  }
+
+  let mut token_file_path = dirs::config_dir().unwrap().to_str().unwrap().to_owned();
+  token_file_path.push_str("/todo_cli/token.yaml");
+  return Ok(Path::new(token_file_path.as_str()).to_owned());
+}
+
+fn get_token() -> BasicTokenResponse {
+  let token_file = get_token_file_path().unwrap();
+  let token = fs::read_to_string(token_file).expect("Failed to read token");
+  let token: BasicTokenResponse = serde_yaml::from_str(token.as_str()).unwrap();
+  return token;
+}
+
+fn save_token(token: &BasicTokenResponse) {
+  let token_file_path = get_token_file_path().unwrap();
+  let mut token_file = File::create(token_file_path.to_str().unwrap()).unwrap();
+  let token_serialized = serde_yaml::to_string(token).ok().unwrap();
+  let _ = token_file.write_all(token_serialized.as_bytes());
+}
+
+fn refresh_token(token: BasicTokenResponse) -> BasicTokenResponse {
+  let client_id = dotenv::var("TODO_CLI_CLIENT_ID").ok().unwrap();
+  let auth_url = dotenv::var("TODO_CLI_AUTH_URL").ok().unwrap();
+  let token_url = dotenv::var("TODO_CLI_TOKEN_URL").ok().unwrap();
+
+  let graph_client_id = ClientId::new(client_id);
+  let graph_auth_url = AuthUrl::new(auth_url).expect("Invalid authorization endpoint URL");
+  let graph_token_url = TokenUrl::new(token_url).expect("Invalid token endpoint URL");
+
+  let client = BasicClient::new(graph_client_id, None, graph_auth_url, Some(graph_token_url))
+    .set_auth_type(AuthType::RequestBody);
+
+  let _refresh_token = token.refresh_token().unwrap();
+  let new_token_request = client.exchange_refresh_token(_refresh_token)
+    .request(http_client);
+  let new_token = new_token_request.unwrap();
+  save_token(&new_token);
+  return new_token;
 }
