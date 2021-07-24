@@ -65,8 +65,8 @@ fn main() {
       task_text.push_str(" ");
     }
     task_text = String::from(task_text.strip_suffix(" ").unwrap());
-    create_task(task_list, task_text);
     println!("Added task: {:?}", task_text);
+    create_task(task_list, task_text);
   }
 }
 
