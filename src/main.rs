@@ -65,6 +65,10 @@ fn main() {
       task_text.push_str(value);
       task_text.push_str(" ");
     }
+    if task_text == "" {
+      println!("No task created, missing task text");
+      return;
+    }
     task_text = String::from(task_text.strip_suffix(" ").unwrap());
     println!("Added task: {:?}", task_text);
     create_task(task_list, task_text);
