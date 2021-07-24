@@ -13,6 +13,7 @@ TODO_CLI_CLIENT_SECRET="MS Graph client secret"
 TODO_CLI_AUTH_URL=https://login.microsoftonline.com/common/oauth2/v2.0/authorize
 TODO_CLI_TOKEN_URL=https://login.microsoftonline.com/common/oauth2/v2.0/token
 TODO_CLI_REDIRECT_URL=http://localhost:7594/auth
+TODO_CLI_DEFAULT_TASK_LIST=infinCUBE
 ```
 
 - Compile
@@ -37,7 +38,7 @@ cargo build --release
 ./todo New task content
 ```
 
-- To list or create tasks on specific Task List use `--task_list` flag
+- To list or create tasks on specific Task List use `--task_list` flag, by default we use task list defined by `TODO_CLI_DEFAULT_TASK_LIST` variable.
 ```shell
 ./todo --list --task_list list_name
 ./todo --task_list list_name New task text

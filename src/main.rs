@@ -38,7 +38,8 @@ fn main() {
     .get_matches();
 
   let list = matches.is_present("list");
-  let task_list = matches.value_of("task_list").unwrap_or("infinCUBE");
+  let default_task_list = dotenv::var("TODO_CLI_DEFAULT_TASK_LIST").ok().unwrap();
+  let task_list = matches.value_of("task_list").unwrap_or(default_task_list.as_str());
   let task_text_values: Values = matches.values_of("task_text").unwrap_or(Values::default());
   println!("{}", task_list);
 
