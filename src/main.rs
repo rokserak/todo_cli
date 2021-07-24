@@ -14,7 +14,7 @@ use reqwest::StatusCode;
 
 extern crate dotenv;
 extern crate clap;
-use clap::{Arg, App};
+use clap::{Arg, App, Values};
 #[macro_use] extern crate rocket;
 
 
@@ -32,10 +32,14 @@ fn main() {
       .long("task_list")
       .takes_value(true)
       .help("Task list that we want to view or create task on"))
+    .arg(Arg::with_name("task_text")
+      .required(false)
+      .min_values(1))
     .get_matches();
 
   let list = matches.is_present("list");
   let task_list = matches.value_of("task_list").unwrap_or("infinCUBE");
+  let mut task_text_values: Values = matches.values_of("task_text").unwrap();
   println!("{}", task_list);
 
   let token_file = get_token_file_path().unwrap();
@@ -55,18 +59,14 @@ fn main() {
       println!("{} - {}", i, task.title);
     }
   } else {
-    let mut args: Vec<String> = env::args().collect();
-    args.remove(0);
-
-    if args.len() == 0 {
-      println!("Missing task content");
-      return;
+    let mut task_text = String::from("");
+    for value in task_text_values {
+      task_text.push_str(value);
+      task_text.push_str(" ");
     }
-
-    let task_text = args.join(" ");
-
-    let task_text = String::from(task_text);
+    task_text = String::from(task_text.strip_suffix(" ").unwrap());
     create_task(task_list, task_text);
+    println!("Added task: {:?}", task_text);
   }
 }
 
