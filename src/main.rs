@@ -1,7 +1,7 @@
 use oauth2::basic::{BasicClient, BasicTokenResponse};
 use oauth2::reqwest::http_client;
 use oauth2::{AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl, TokenResponse};
-use std::{thread, fs, io, env};
+use std::{thread, fs, io};
 use std::time::Duration;
 use std::fs::File;
 use std::io::prelude::*;
@@ -34,12 +34,12 @@ fn main() {
       .help("Task list that we want to view or create task on"))
     .arg(Arg::with_name("task_text")
       .required(false)
-      .min_values(1))
+      .min_values(0))
     .get_matches();
 
   let list = matches.is_present("list");
   let task_list = matches.value_of("task_list").unwrap_or("infinCUBE");
-  let mut task_text_values: Values = matches.values_of("task_text").unwrap();
+  let task_text_values: Values = matches.values_of("task_text").unwrap_or(Values::default());
   println!("{}", task_list);
 
   let token_file = get_token_file_path().unwrap();
@@ -261,7 +261,7 @@ fn get_tasks_on_list(task_list: &TaskList) -> Vec<Task> {
   let response_text = get_request(url.as_str());
   let tasks_on_list: TasksOnList = serde_json::from_str(response_text.as_str()).unwrap();
   let tasks = tasks_on_list.value;
-  return tasks.into_iter().filter(|task| task.status == "notStarted").collect();
+  return tasks.into_iter().filter(|task| task.status != "completed").collect();
 }
 
 #[derive(Serialize, Deserialize, Debug)]
