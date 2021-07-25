@@ -1,7 +1,7 @@
 use oauth2::basic::{BasicClient, BasicTokenResponse};
 use oauth2::reqwest::http_client;
 use oauth2::{AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken, RedirectUrl, Scope, TokenUrl, TokenResponse};
-use std::{thread, fs, io};
+use std::{thread, fs, io, env};
 use std::time::Duration;
 use std::fs::File;
 use std::io::prelude::*;
@@ -38,7 +38,7 @@ fn main() {
     .get_matches();
 
   let list = matches.is_present("list");
-  let default_task_list = dotenv::var("TODO_CLI_DEFAULT_TASK_LIST").ok().unwrap();
+  let default_task_list = env::var("TODO_CLI_DEFAULT_TASK_LIST").ok().unwrap();
   let task_list = matches.value_of("task_list").unwrap_or(default_task_list.as_str());
   let task_text_values: Values = matches.values_of("task_text").unwrap_or(Values::default());
   println!("{}", task_list);
@@ -86,11 +86,11 @@ fn authenticate_user() {
   });
   thread::sleep(Duration::from_secs(1));
 
-  let client_id = dotenv::var("TODO_CLI_CLIENT_ID").ok().unwrap();
-  let client_secret = dotenv::var("TODO_CLI_CLIENT_SECRET").ok().unwrap();
-  let auth_url = dotenv::var("TODO_CLI_AUTH_URL").ok().unwrap();
-  let token_url = dotenv::var("TODO_CLI_TOKEN_URL").ok().unwrap();
-  let redirect_url = dotenv::var("TODO_CLI_REDIRECT_URL").ok().unwrap();
+  let client_id = env::var("TODO_CLI_CLIENT_ID").ok().unwrap();
+  let client_secret = env::var("TODO_CLI_CLIENT_SECRET").ok().unwrap();
+  let auth_url = env::var("TODO_CLI_AUTH_URL").ok().unwrap();
+  let token_url = env::var("TODO_CLI_TOKEN_URL").ok().unwrap();
+  let redirect_url = env::var("TODO_CLI_REDIRECT_URL").ok().unwrap();
 
   let graph_client_id = ClientId::new(client_id);
   let graph_client_secret = ClientSecret::new(client_secret);
@@ -114,6 +114,7 @@ fn authenticate_user() {
   let token_file = get_token_file_path().unwrap();
   loop {
     if token_file.exists() {
+      thread::sleep(Duration::from_millis(10));
       break;
     }
   }
@@ -121,10 +122,10 @@ fn authenticate_user() {
 
 #[get("/auth?<code>")]
 fn auth_route(code: &str) -> &'static str {
-  let client_id = dotenv::var("TODO_CLI_CLIENT_ID").ok().unwrap();
-  let auth_url = dotenv::var("TODO_CLI_AUTH_URL").ok().unwrap();
-  let token_url = dotenv::var("TODO_CLI_TOKEN_URL").ok().unwrap();
-  let redirect_url = dotenv::var("TODO_CLI_REDIRECT_URL").ok().unwrap();
+  let client_id = env::var("TODO_CLI_CLIENT_ID").ok().unwrap();
+  let auth_url = env::var("TODO_CLI_AUTH_URL").ok().unwrap();
+  let token_url = env::var("TODO_CLI_TOKEN_URL").ok().unwrap();
+  let redirect_url = env::var("TODO_CLI_REDIRECT_URL").ok().unwrap();
 
   let graph_client_id = ClientId::new(client_id);
   let graph_auth_url = AuthUrl::new(auth_url).expect("Invalid authorization endpoint URL");
@@ -175,9 +176,9 @@ fn save_token(token: &BasicTokenResponse) {
 }
 
 fn refresh_token(token: BasicTokenResponse) -> BasicTokenResponse {
-  let client_id = dotenv::var("TODO_CLI_CLIENT_ID").ok().unwrap();
-  let auth_url = dotenv::var("TODO_CLI_AUTH_URL").ok().unwrap();
-  let token_url = dotenv::var("TODO_CLI_TOKEN_URL").ok().unwrap();
+  let client_id = env::var("TODO_CLI_CLIENT_ID").ok().unwrap();
+  let auth_url = env::var("TODO_CLI_AUTH_URL").ok().unwrap();
+  let token_url = env::var("TODO_CLI_TOKEN_URL").ok().unwrap();
 
   let graph_client_id = ClientId::new(client_id);
   let graph_auth_url = AuthUrl::new(auth_url).expect("Invalid authorization endpoint URL");
