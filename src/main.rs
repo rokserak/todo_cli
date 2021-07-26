@@ -42,7 +42,7 @@ fn main() {
   let default_task_list = env::var("TODO_CLI_DEFAULT_TASK_LIST").ok().unwrap();
   let task_list = matches.value_of("task_list").unwrap_or(default_task_list.as_str());
   let task_text_values: Values = matches.values_of("task_text").unwrap_or(Values::default());
-  println!("{}", task_list);
+  println!("Task List: {}", task_list);
 
   let token_file = get_token_file_path().unwrap();
   if !token_file.exists() {
@@ -58,7 +58,7 @@ fn main() {
   if list {
     let tasks = get_tasks_on_list(task_list);
     for (i, task) in tasks.iter().enumerate() {
-      println!("{} - {}", i, task.title);
+      println!("Task {} | {} | Status: {}", i, task.title, task.status);
     }
   } else {
     let mut task_text = String::from("");
