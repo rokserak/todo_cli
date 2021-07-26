@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
 use reqwest::StatusCode;
+use webbrowser;
 
 
 extern crate dotenv;
@@ -109,7 +110,7 @@ fn authenticate_user() {
     .add_scope(Scope::new("https://graph.microsoft.com/Tasks.ReadWrite.Shared".to_string()))
     .url();
 
-  println!("Open this URL in your browser:\n{}\n", authorize_url.to_string());
+  let _ = webbrowser::open(authorize_url.as_str());
 
   let token_file = get_token_file_path().unwrap();
   loop {
