@@ -264,11 +264,11 @@ struct TasksOnList {
 }
 
 fn get_tasks_on_list(task_list: &TaskList) -> Vec<Task> {
-  let url = format!("https://graph.microsoft.com/v1.0/me/todo/lists/{}/tasks", task_list.id);
+  let url = format!("https://graph.microsoft.com/v1.0/me/todo/lists/{}/tasks?$filter=status eq 'notStarted'", task_list.id);
   let response_text = get_request(url.as_str());
   let tasks_on_list: TasksOnList = serde_json::from_str(response_text.as_str()).unwrap();
   let tasks = tasks_on_list.value;
-  return tasks.into_iter().filter(|task| task.status != "completed").collect();
+  return tasks;
 }
 
 #[derive(Serialize, Deserialize, Debug)]
