@@ -40,9 +40,8 @@ fn main() {
 
   let list = matches.is_present("list");
   let default_task_list = env::var("TODO_CLI_DEFAULT_TASK_LIST").ok().unwrap();
-  let task_list = matches.value_of("task_list").unwrap_or(default_task_list.as_str());
+  let task_list_name = matches.value_of("task_list").unwrap_or(default_task_list.as_str());
   let task_text_values: Values = matches.values_of("task_text").unwrap_or(Values::default());
-  println!("Task List: {}", task_list);
 
   let token_file = get_token_file_path().unwrap();
   if !token_file.exists() {
@@ -52,8 +51,16 @@ fn main() {
   let task_lists = get_task_lists();
   let task_list = task_lists
     .iter()
-    .filter(|task| task.displayName == String::from(task_list))
-    .last().unwrap();
+    .filter(|task| task.displayName == String::from(task_list_name))
+    .last();
+
+  if task_list.is_none() {
+    println!("Task List {} does not exist", task_list_name);
+    return;
+  }
+
+  let task_list = task_list.unwrap();
+  println!("Task List: {}", task_list_name);
 
   if list {
     let tasks = get_tasks_on_list(task_list);
